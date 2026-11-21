@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIKKI SPACE マイク | 発音チェック・録音</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif; background:#f2f4f8; color:#1c2434; }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 48px; }
+  .kicker { color:#e05a8a; font-weight:700; font-size:13px; letter-spacing:.08em; margin:8px 0 2px; }
+  h1 { font-size:24px; margin:2px 0 10px; }
+  .sub { color:#5a6480; font-size:13px; line-height:1.7; }
+  .card { background:#fff; border-radius:14px; padding:16px; margin:14px 0; box-shadow:0 1px 4px rgba(20,30,60,.08); }
+  .card h2 { font-size:16px; margin:0 0 10px; }
+  #modelText { font-size:17px; line-height:1.9; margin:0; }
+  textarea { width:100%; min-height:84px; border:1px solid #ccd3e0; border-radius:10px; padding:10px; font-size:15px; font-family:inherit; }
+  .btn { display:inline-block; border:none; border-radius:999px; padding:12px 20px; font-size:15px; font-weight:700; cursor:pointer; margin:6px 6px 0 0; }
+  .btn.primary { background:#2b3a67; color:#fff; }
+  .btn.gold { background:#f2b544; color:#231a04; }
+  .btn.plain { background:#e8ecf4; color:#1c2434; }
+  .btn:disabled { opacity:.5; }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 4px; }
+  .seg button { border:1px solid #ccd3e0; background:#fff; border-radius:999px; padding:7px 13px; font-size:13px; cursor:pointer; }
+  .seg button.on { background:#2b3a67; color:#fff; border-color:#2b3a67; }
+  label { display:block; font-size:13px; color:#5a6480; margin-top:10px; }
+  .word-ok { color:#1d9e6c; font-weight:700; }
+  .word-bad { color:#d6455a; font-weight:700; text-decoration:underline; }
+  .recRow { display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid #eef1f6; }
+  .recRow audio { flex:1; height:36px; }
+  .del { background:none; border:none; color:#d6455a; font-size:13px; cursor:pointer; }
+  .note { background:#fff7e0; border:1px solid #f2d98c; border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="kicker">NIKKI SPACE</p>
+  <h1>マイク（発音チェック・録音）</h1>
+  <p class="sub">NIKKI SPACE のアプリ画面ではブラウザの都合でマイクが使えないため、発音チェックと録音はこの専用ページで行います。お手本の文はアプリから自動で入ります。</p>
+
+  <div class="card">
+    <h2>お手本の文</h2>
+    <p id="modelText"></p>
+    <div id="editArea" style="display:none; margin-top:10px;">
+      <textarea id="modelInput" placeholder="練習したい英文を入力してください"></textarea>
+      <button class="btn plain" id="applyText">この文で練習する</button>
+    </div>
+    <button class="btn plain" id="editBtn">文を変える</button>
+    <label>アクセント</label>
+    <div class="seg" id="accentSeg"></div>
+    <div>
+      <button class="btn primary" id="playBtn">▶ お手本を再生</button>
+      <button class="btn plain" id="stopBtn">⏹ 停止</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>発音チェック</h2>
+    <p class="sub">お手本を聞いたら、ボタンを押して声に出してください。言えた語と言えなかった語を色分けします。点数は出しません。</p>
+    <button class="btn gold" id="checkBtn">🎙 言ってチェックする</button>
+    <div id="checkResult" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>自分の声を録音</h2>
+    <p class="sub">録音はこのブラウザの中だけに残ります（このページを開いている端末・ブラウザごと）。</p>
+    <button class="btn plain" id="recBtn">🎙 録音する</button>
+    <div id="recList" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="note">このページでの発音チェック・録音は練習用です。結果は日記には自動で保存されません。日記の保存は NIKKI SPACE のアプリ側で「保存して終わる」を押してください。</div>
+</div>
+
+<script>
+var ACCENTS = { 'en-US':'アメリカ', 'en-GB':'イギリス', 'en-CA':'カナダ', 'en-AU':'オーストラリア', 'en-NZ':'ニュージーランド' };
+var params = new URLSearchParams(location.search);
+var modelText = params.get('text') || '';
+var accent = ACCENTS[params.get('accent')] ? params.get('accent') : 'en-US';
+
+var modelEl = document.getElementById('modelText');
+function renderModel(){ modelEl.textContent = modelText || '（文が指定されていません。「文を変える」から入力してください）'; }
+renderModel();
+
+document.getElementById('editBtn').addEventListener('click', function(){
+  var a = document.getElementById('editArea');
+  a.style.display = a.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('modelInput').value = modelText;
+});
+document.getElementById('applyText').addEventListener('click', function(){
+  modelText = document.getElementById('modelInput').value.trim();
+  renderModel();
+  document.getElementById('editArea').style.display = 'none';
+});
+
+var seg = document.getElementById('accentSeg');
+Object.keys(ACCENTS).forEach(function(a){
+  var b = document.createElement('button');
+  b.textContent = ACCENTS[a];
+  if (a === accent) b.className = 'on';
+  b.addEventListener('click', function(){
+    accent = a;
+    seg.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+  });
+  seg.appendChild(b);
+});
+
+/* 読み上げ（自然な声を優先） */
+var voiceCache = [];
+function refreshVoices(){ try { voiceCache = speechSynthesis.getVoices() || []; } catch(e){ voiceCache = []; } }
+if (window.speechSynthesis) { refreshVoices(); speechSynthesis.onvoiceschanged = refreshVoices; }
+var NOVELTY = ['Albert','Bad News','Bahh','Bells','Boing','Bubbles','Cellos','Deranged','Fred','Good News','Grandma','Grandpa','Hysterical','Jester','Junior','Organ','Pipe Organ','Superstar','Trinoids','Whisper','Wobble','Zarvox'];
+function pickVoice(){
+  var usable = voiceCache.filter(function(v){ return NOVELTY.indexOf(v.name) < 0 && /^en/i.test(v.lang); });
+  var chain = [accent, 'en-US', 'en-GB'];
+  for (var c = 0; c < chain.length; c++) {
+    var cands = usable.filter(function(v){ return v.lang.replace('_','-').toLowerCase().indexOf(chain[c].toLowerCase()) === 0; });
+    if (!cands.length) continue;
+    var g = cands.filter(function(v){ return /Google/.test(v.name); });
+    if (g.length) return g[0];
+    var prem = cands.filter(function(v){ return /Premium|Enhanced/.test(v.name); });
+    if (prem.length) return prem[0];
+    return cands[0];
+  }
+  return usable[0] || null;
+}
+function speak(text){
+  if (!window.speechSynthesis) { alert('このブラウザでは読み上げが使えません'); return; }
+  speechSynthesis.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  var v = pickVoice();
+  if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = accent; }
+  speechSynthesis.speak(u);
+}
+document.getElementById('playBtn').addEventListener('click', function(){ if (modelText) speak(modelText); });
+document.getElementById('stopBtn').addEventListener('click', function(){ if (window.speechSynthesis) speechSynthesis.cancel(); });
+
+/* 発音チェック */
+function tokenizeWords(s){
+  return String(s || '').toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(function(w){ return !!w; });
+}
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+document.getElementById('checkBtn').addEventListener('click', function(){
+  var box = document.getElementById('checkResult');
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { box.innerHTML = '<p class="sub">このブラウザでは音声認識が使えません。Chromeで開いてください。</p>'; return; }
+  if (!modelText) { box.innerHTML = '<p class="sub">先にお手本の文を用意してください。</p>'; return; }
+  var rec = new SR();
+  rec.lang = accent;
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  box.innerHTML = '<p class="sub">聞いています…お手本の文を、声に出してください。</p>';
+  var finished = false;
+  rec.onresult = function(ev){
+    finished = true;
+    var heard = ev.results[0][0].transcript || '';
+    var heardSet = {};
+    tokenizeWords(heard).forEach(function(w){ heardSet[w] = true; });
+    var words = tokenizeWords(modelText).map(function(w){ return { word: w, ok: !!heardSet[w] }; });
+    var spans = words.map(function(w){ return '<span class="' + (w.ok ? 'word-ok' : 'word-bad') + '">' + esc(w.word) + '</span>'; }).join(' ');
+    var bad = words.filter(function(w){ return !w.ok; }).slice(0, 6);
+    var html = '<p style="font-size:16px; line-height:1.9;">' + spans + '</p><p class="sub">あなた: ' + esc(heard) + '</p>';
+    if (bad.length) html += '<p>直してみたい語：' + bad.map(function(w){ return '「' + esc(w.word) + '」'; }).join('、') + '。お手本をもう一度聞いて、ゆっくり言ってみてください。</p>';
+    else html += '<p>お手本の語を、一通り言えています。もう一度お手本と聞き比べてみましょう。</p>';
+    box.innerHTML = html;
+  };
+  rec.onerror = function(e){
+    if (!finished) box.innerHTML = '<p class="sub">うまく聞き取れませんでした（' + esc(e.error || 'error') + '）。マイクの許可を確認して、もう一度どうぞ。</p>';
+  };
+  try { rec.start(); } catch(e){ box.innerHTML = '<p class="sub">音声認識を始められませんでした。</p>'; }
+});
+
+/* 録音（IndexedDB） */
+var db = null;
+function dbOpen(cb){
+  if (db) { cb(db); return; }
+  var req = indexedDB.open('nikki-mic-rec', 1);
+  req.onupgradeneeded = function(){ req.result.createObjectStore('audio', { autoIncrement: true }); };
+  req.onsuccess = function(){ db = req.result; cb(db); };
+  req.onerror = function(){ cb(null); };
+}
+function recList(cb){
+  dbOpen(function(d){
+    if (!d) { cb([]); return; }
+    var out = [];
+    var req = d.transaction('audio', 'readonly').objectStore('audio').openCursor();
+    req.onsuccess = function(){
+      var cur = req.result;
+      if (cur) { out.push({ key: cur.key, at: cur.value.at, type: cur.value.type, blob: cur.value.blob }); cur.continue(); }
+      else { out.sort(function(a,b){ return b.at - a.at; }); cb(out); }
+    };
+    req.onerror = function(){ cb([]); };
+  });
+}
+function renderRecs(){
+  recList(function(items){
+    var box = document.getElementById('recList');
+    if (!items.length) { box.innerHTML = '<p class="sub">まだ録音がありません。</p>'; return; }
+    box.innerHTML = '';
+    items.forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'recRow';
+      var label = document.createElement('span');
+      label.className = 'sub';
+      label.textContent = new Date(it.at).toLocaleString('ja-JP');
+      var audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = URL.createObjectURL(it.blob);
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '削除';
+      del.addEventListener('click', function(){
+        dbOpen(function(d){
+          if (!d) return;
+          var tx = d.transaction('audio', 'readwrite');
+          tx.objectStore('audio').delete(it.key);
+          tx.oncomplete = renderRecs;
+        });
+      });
+      row.appendChild(label); row.appendChild(audio); row.appendChild(del);
+      box.appendChild(row);
+    });
+  });
+}
+renderRecs();
+
+var mediaRecorder = null, chunks = [];
+document.getElementById('recBtn').addEventListener('click', function(){
+  var btn = this;
+  if (mediaRecorder && mediaRecorder.state === 'recording') { mediaRecorder.stop(); btn.textContent = '🎙 録音する'; return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { alert('このブラウザでは録音できません。Chromeで開いてください。'); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
+    chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
+    mediaRecorder.onstop = function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      var blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      dbOpen(function(d){
+        if (!d) return;
+        var tx = d.transaction('audio', 'readwrite');
+        tx.objectStore('audio').add({ at: Date.now(), type: blob.type, blob: blob });
+        tx.oncomplete = renderRecs;
+      });
+    };
+    mediaRecorder.start();
+    btn.textContent = '⏹ 止める';
+  }).catch(function(){ alert('マイクを使えませんでした。ブラウザのアドレスバーからマイクの許可を確認してください。'); });
+});
+</script>
+</body>
+</html>
